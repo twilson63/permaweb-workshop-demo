@@ -1,4 +1,9 @@
 <script>
+  import { ArweaveWebWallet } from "arweave-wallet-connector";
+
+  const wallet = new ArweaveWebWallet({ name: "Test" });
+  wallet.setUrl("arweave.app");
+
   const query = `
 query {
 	transactions(first: 100, tags: {name: "App-Name", values: ["PublicSquare"]}) {
@@ -16,27 +21,33 @@ query {
 }
 `;
 
+  const arweave = window.Arweave.init({
+    host: "arweave.net",
+    port: 443,
+    protocol: "https",
+  });
   async function load() {
-    const arweave = window.Arweave.init({
-      host: "arweave.net",
-      port: 443,
-      protocol: "https",
-    });
     return await arweave.api.post("graphql", { query });
   }
 
   async function handleSubmit(e) {
-    const arweave = window.Arweave.init({});
+    if (window.arweaveWallet) {
+      await window.arweaveWallet.connect(["DISPATCH"]);
+    } else {
+      await wallet.connect();
+    }
     // get wallet
-    const tx = arweave.createTransaction({ data: e.target.note.value });
+    const tx = await arweave.createTransaction({ data: e.target.note.value });
     tx.addTag("Content-Type", "text/plain");
-    await arweave.transactions.sign(tx);
-    await arweave.transactions.post(tx);
+    await window.arweaveWallet.dispatch(tx);
+    //await arweave.transactions.sign(tx);
+    //await arweave.transactions.post(tx);
+
+    console.log({ id: tx.id });
   }
 
   function getPost(tx) {
-    const arweave = window.Arweave.init({});
-    return arweave.api.get("https://arweave.net/" + tx).then((r) => r.data);
+    return arweave.api.get(tx).then((r) => r.data);
   }
 </script>
 
