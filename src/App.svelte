@@ -1,47 +1,59 @@
 <script>
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
+  const query = `
+query {
+	transactions(first: 100, tags: {name: "App-Name", values: ["PublicSquare"]}) {
+		edges {
+			node { 
+				id
+				owner { address }
+				tags {
+					name 
+					value
+				}
+			}
+		}
+	}	
+}
+`;
+
+  async function load() {
+    const arweave = window.Arweave.init({
+      host: "arweave.net",
+      port: 443,
+      protocol: "https",
+    });
+    return await arweave.api.post("graphql", { query });
+  }
+
+  async function handleSubmit(e) {
+    const arweave = window.Arweave.init({});
+    // get wallet
+    const tx = arweave.createTransaction({ data: e.target.note.value });
+    tx.addTag("Content-Type", "text/plain");
+    await arweave.transactions.sign(tx);
+    await arweave.transactions.post(tx);
+  }
+
+  function getPost(tx) {
+    const arweave = window.Arweave.init({});
+    return arweave.api.get("https://arweave.net/" + tx).then((r) => r.data);
+  }
 </script>
 
-<main>
-  <div>
-    <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-      <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
+<form
+  class="flex flex-col mb-16 space-y-4"
+  on:submit|preventDefault={handleSubmit}
+>
+  <textarea class="textarea" placeholder="whats happening?" name="note" />
+  <button class="btn btn-block"> Post </button>
+</form>
 
-  <div class="card">
-    <Counter />
-  </div>
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
-</main>
-
-<style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
-  }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-  }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
-  }
-  .read-the-docs {
-    color: #888;
-  }
-</style>
+{#await load() then result}
+  {#each result.data.data.transactions.edges as edge}
+    {#await getPost(edge.node.id) then post}
+      <div class="border-2 p-4">
+        {post}
+      </div>
+    {/await}
+  {/each}
+{/await}
