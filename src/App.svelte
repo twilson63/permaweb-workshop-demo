@@ -1,4 +1,9 @@
 <script>
+  import {
+    DeployPlugin,
+    InjectedArweaveSigner,
+    // @ts-ignore
+  } from "https://unpkg.com/warp-contracts-plugin-deploy@1.0.1/bundles/web.bundle.min.js";
   import { ArweaveWebWallet } from "arweave-wallet-connector";
 
   const wallet = new ArweaveWebWallet({ name: "Test" });
@@ -31,19 +36,41 @@ query {
   }
 
   async function handleSubmit(e) {
+    warp = window.warp.WarpFactory.forMainnet().use(new DeployPlugin());
     if (window.arweaveWallet) {
       await window.arweaveWallet.connect(["DISPATCH"]);
     } else {
       await wallet.connect();
     }
     // get wallet
+    const address = await window.arweaveWallet.getActiveAddress();
     const tx = await arweave.createTransaction({ data: e.target.note.value });
     tx.addTag("Content-Type", "text/plain");
-    await window.arweaveWallet.dispatch(tx);
+    tx.addTag("App-Name", "PublicSquare");
+    tx.addTag("Version", "1.0.1");
+    tx.addTag("Type", "post");
+    tx.addTag("App-Name", "SmartWeaveContract");
+    tx.addTag("App-Version", "0.3.0");
+    tx.addTag("Contract-Src", "x0ojRwrcHBmZP20Y4SY0mgusMRx-IYTjg5W8c3UFoNs");
+    tx.addTag(
+      "Init-State",
+      JSON.stringify({
+        pairs: [],
+        balances: {
+          [address]: 1 * 1e12,
+        },
+        name: "Atomic Token",
+        ticker: "ATOMIC",
+        settings: [["isTradeable", true]],
+      })
+    );
+
+    const result = await window.arweaveWallet.dispatch(tx);
+    await warp.register(result.id, "node2");
     //await arweave.transactions.sign(tx);
     //await arweave.transactions.post(tx);
 
-    console.log({ id: tx.id });
+    console.log({ id: result.id });
   }
 
   function getPost(tx) {
